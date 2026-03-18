@@ -162,6 +162,30 @@ export const SG_CARD_TYPES = [
     fallback_rate: 0.3,
     image_url: null,
   },
+  {
+    name: 'AMEX Platinum Charge',
+    bank: 'AMEX',
+    reward_type: 'miles' as const,
+    program: 'krisflyer' as const,
+    reward_rules: [
+      { categories: ['*'], rate: 1.25, channel: 'any' },
+      { categories: ['*'], rate: 2.0, channel: 'overseas' },
+    ],
+    fallback_rate: 1.25,
+    image_url: null,
+  },
+  {
+    name: 'UOB KrisFlyer',
+    bank: 'UOB',
+    reward_type: 'miles' as const,
+    program: 'krisflyer' as const,
+    reward_rules: [
+      { categories: ['*'], rate: 1.2, channel: 'any' },
+      { categories: ['*'], rate: 2.0, channel: 'overseas' },
+    ],
+    fallback_rate: 1.2,
+    image_url: null,
+  },
 ]
 
 export const GST_RATE = 0.09 // 9% GST in Singapore (as of 2024)

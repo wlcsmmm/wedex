@@ -41,4 +41,14 @@ INSERT INTO card_types (name, bank, reward_type, program, reward_rules, fallback
   'UOB One', 'UOB', 'cashback', NULL,
   '[{"categories":["*"],"rate":3.33,"min_spend":500},{"categories":["*"],"rate":0.3}]',
   0.3
+),
+(
+  'AMEX Platinum Charge', 'AMEX', 'miles', 'krisflyer',
+  '[{"categories":["*"],"rate":1.25,"channel":"any"},{"categories":["*"],"rate":2.0,"channel":"overseas"}]',
+  1.25
+),
+(
+  'UOB KrisFlyer', 'UOB', 'miles', 'krisflyer',
+  '[{"categories":["*"],"rate":1.2,"channel":"any"},{"categories":["*"],"rate":2.0,"channel":"overseas"}]',
+  1.2
 );
