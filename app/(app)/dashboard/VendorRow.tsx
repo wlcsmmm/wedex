@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { formatSGD } from '@/lib/gst'
 import { CATEGORY_LABELS } from '@/lib/constants'
 import type { Vendor, CreditCard, CardType, WeddingCategory } from '@/lib/types'
@@ -43,7 +44,7 @@ export default function VendorRow({ vendor, cards }: VendorRowProps) {
   const statusStyle = STATUS_STYLES[vendor.status] ?? 'bg-charcoal/8 text-charcoal/50'
 
   return (
-    <div className="flex items-center gap-3 py-3 px-4 hover:bg-warm-white rounded-xl transition-colors group">
+    <Link href={`/vendors/${vendor.id}`} className="flex items-center gap-3 py-3 px-4 hover:bg-warm-white rounded-xl transition-colors group">
       {/* Name + category */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-charcoal truncate">{vendor.name}</p>
@@ -66,6 +67,6 @@ export default function VendorRow({ vendor, cards }: VendorRowProps) {
       <span className={`hidden md:inline-block text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${statusStyle}`}>
         {vendor.status === 'fully_paid' ? 'Paid' : vendor.status === 'cancelled' ? 'Cancelled' : 'Active'}
       </span>
-    </div>
+    </Link>
   )
 }
