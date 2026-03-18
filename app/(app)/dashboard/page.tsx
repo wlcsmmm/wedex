@@ -1,15 +1,20 @@
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { formatSGD } from '@/lib/gst'
-import type { Wedding } from '@/lib/types'
+import type { Wedding, Vendor, Budget, CreditCard, CardType } from '@/lib/types'
+import DashboardShell from './DashboardShell'
+
+type CardWithType = CreditCard & { card_types: CardType }
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  if (!user) redirect('/login')
+
   const { data: memberRaw } = await supabase
     .from('wedding_members')
     .select('wedding_id, weddings(*)')
-    .eq('user_id', user!.id)
+    .eq('user_id', user.id)
     .single()
 
   const wedding = (memberRaw as { wedding_id: string; weddings: Wedding } | null)?.weddings ?? null
@@ -27,43 +32,33 @@ export default async function DashboardPage() {
     )
   }
 
+  // Parallel data fetches
+  const [{ data: vendorsRaw }, { data: budgetsRaw }, { data: cardsRaw }] = await Promise.all([
+    supabase
+      .from('vendors')
+      .select('*')
+      .eq('wedding_id', wedding.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('budgets')
+      .select('*')
+      .eq('wedding_id', wedding.id),
+    supabase
+      .from('credit_cards')
+      .select('*, card_types(*)')
+      .eq('wedding_id', wedding.id),
+  ])
+
+  const vendors = (vendorsRaw ?? []) as Vendor[]
+  const budgets = (budgetsRaw ?? []) as Budget[]
+  const cards = (cardsRaw ?? []) as CardWithType[]
+
   return (
-    <div className="p-6 md:p-8 max-w-6xl">
-      <h1 className="text-2xl font-bold text-charcoal mb-2">{wedding.name}</h1>
-      <p className="text-charcoal/50 text-sm mb-8">
-        Budget: {formatSGD(wedding.total_budget)}
-        {wedding.date
-          ? ` · ${new Date(wedding.date).toLocaleDateString('en-SG', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}`
-          : ''}
-      </p>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: 'Total Budget', value: formatSGD(wedding.total_budget), color: 'text-charcoal' },
-          { label: 'Planned', value: formatSGD(0), color: 'text-blush' },
-          { label: 'Remaining', value: formatSGD(wedding.total_budget), color: 'text-sage' },
-          { label: 'Miles Earned', value: '0 mi', color: 'text-charcoal/60' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="bg-white rounded-2xl p-4 border border-charcoal/8">
-            <p className="text-xs text-charcoal/50 mb-1">{label}</p>
-            <p className={`text-xl font-bold ${color}`}>{value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-2xl border border-charcoal/8 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-charcoal">Vendors</h2>
-          <a href="/onboarding" className="text-sm text-blush hover:underline">+ Add vendor</a>
-        </div>
-        <p className="text-sm text-charcoal/40 py-8 text-center">
-          No vendors yet. Add your first vendor to get started.
-        </p>
-      </div>
-    </div>
+    <DashboardShell
+      wedding={wedding}
+      initialVendors={vendors}
+      budgets={budgets}
+      cards={cards}
+    />
   )
 }
