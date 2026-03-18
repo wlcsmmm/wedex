@@ -6,15 +6,13 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Get the user's wedding via membership
   const { data: memberRaw } = await supabase
     .from('wedding_members')
     .select('wedding_id, weddings(*)')
     .eq('user_id', user!.id)
     .single()
 
-  const member = memberRaw as { wedding_id: string; weddings: Wedding } | null
-  const wedding = member?.weddings ?? null
+  const wedding = (memberRaw as { wedding_id: string; weddings: Wedding } | null)?.weddings ?? null
 
   if (!wedding) {
     return (
