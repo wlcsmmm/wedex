@@ -1,12 +1,11 @@
 -- ============================================================
--- Wedex — Initial Schema
+-- Wedex — Initial Schema (idempotent)
 -- ============================================================
 
--- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ─── card_types (shared, read-only for users) ───────────────
-CREATE TABLE card_types (
+-- ─── card_types ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS card_types (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   bank TEXT NOT NULL,
@@ -18,7 +17,7 @@ CREATE TABLE card_types (
 );
 
 -- ─── weddings ───────────────────────────────────────────────
-CREATE TABLE weddings (
+CREATE TABLE IF NOT EXISTS weddings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   date DATE,
@@ -31,7 +30,7 @@ CREATE TABLE weddings (
 );
 
 -- ─── wedding_members ────────────────────────────────────────
-CREATE TABLE wedding_members (
+CREATE TABLE IF NOT EXISTS wedding_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wedding_id UUID REFERENCES weddings(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id),
@@ -42,7 +41,7 @@ CREATE TABLE wedding_members (
 );
 
 -- ─── budgets ────────────────────────────────────────────────
-CREATE TABLE budgets (
+CREATE TABLE IF NOT EXISTS budgets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wedding_id UUID REFERENCES weddings(id) ON DELETE CASCADE,
   category TEXT NOT NULL,
@@ -52,7 +51,7 @@ CREATE TABLE budgets (
 );
 
 -- ─── credit_cards ───────────────────────────────────────────
-CREATE TABLE credit_cards (
+CREATE TABLE IF NOT EXISTS credit_cards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wedding_id UUID REFERENCES weddings(id) ON DELETE CASCADE,
   member_id UUID REFERENCES wedding_members(id),
@@ -62,7 +61,7 @@ CREATE TABLE credit_cards (
 );
 
 -- ─── vendors ────────────────────────────────────────────────
-CREATE TABLE vendors (
+CREATE TABLE IF NOT EXISTS vendors (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wedding_id UUID REFERENCES weddings(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -78,7 +77,7 @@ CREATE TABLE vendors (
 );
 
 -- ─── expenses ───────────────────────────────────────────────
-CREATE TABLE expenses (
+CREATE TABLE IF NOT EXISTS expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wedding_id UUID REFERENCES weddings(id) ON DELETE CASCADE,
   vendor_id UUID REFERENCES vendors(id),
@@ -99,7 +98,7 @@ CREATE TABLE expenses (
 );
 
 -- ─── ang_baos ───────────────────────────────────────────────
-CREATE TABLE ang_baos (
+CREATE TABLE IF NOT EXISTS ang_baos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wedding_id UUID REFERENCES weddings(id) ON DELETE CASCADE,
   table_number INTEGER,
@@ -110,7 +109,7 @@ CREATE TABLE ang_baos (
 );
 
 -- ============================================================
--- Row Level Security
+-- Row Level Security (ALTER is idempotent — safe to re-run)
 -- ============================================================
 
 ALTER TABLE weddings ENABLE ROW LEVEL SECURITY;
@@ -122,7 +121,7 @@ ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ang_baos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE card_types ENABLE ROW LEVEL SECURITY;
 
--- Helper function: check if user is a member of a wedding
+-- Helper function (OR REPLACE = idempotent)
 CREATE OR REPLACE FUNCTION is_wedding_member(p_wedding_id UUID)
 RETURNS BOOLEAN AS $$
   SELECT EXISTS (
@@ -132,11 +131,22 @@ RETURNS BOOLEAN AS $$
   );
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
--- card_types: anyone authenticated can read
+-- Policies (drop first so re-runs don't error)
+DROP POLICY IF EXISTS "card_types_read" ON card_types;
+DROP POLICY IF EXISTS "weddings_select" ON weddings;
+DROP POLICY IF EXISTS "weddings_insert" ON weddings;
+DROP POLICY IF EXISTS "weddings_update" ON weddings;
+DROP POLICY IF EXISTS "members_select" ON wedding_members;
+DROP POLICY IF EXISTS "members_insert" ON wedding_members;
+DROP POLICY IF EXISTS "budgets_all" ON budgets;
+DROP POLICY IF EXISTS "credit_cards_all" ON credit_cards;
+DROP POLICY IF EXISTS "vendors_all" ON vendors;
+DROP POLICY IF EXISTS "expenses_all" ON expenses;
+DROP POLICY IF EXISTS "ang_baos_all" ON ang_baos;
+
 CREATE POLICY "card_types_read" ON card_types
   FOR SELECT USING (auth.role() = 'authenticated');
 
--- weddings: members can read; owner can insert/update
 CREATE POLICY "weddings_select" ON weddings
   FOR SELECT USING (is_wedding_member(id));
 
@@ -146,40 +156,34 @@ CREATE POLICY "weddings_insert" ON weddings
 CREATE POLICY "weddings_update" ON weddings
   FOR UPDATE USING (is_wedding_member(id));
 
--- wedding_members: members can read their own wedding's members
 CREATE POLICY "members_select" ON wedding_members
   FOR SELECT USING (is_wedding_member(wedding_id));
 
 CREATE POLICY "members_insert" ON wedding_members
   FOR INSERT WITH CHECK (auth.uid() = user_id OR is_wedding_member(wedding_id));
 
--- budgets: members can read/write
 CREATE POLICY "budgets_all" ON budgets
   USING (is_wedding_member(wedding_id))
   WITH CHECK (is_wedding_member(wedding_id));
 
--- credit_cards: members can read/write
 CREATE POLICY "credit_cards_all" ON credit_cards
   USING (is_wedding_member(wedding_id))
   WITH CHECK (is_wedding_member(wedding_id));
 
--- vendors: members can read/write
 CREATE POLICY "vendors_all" ON vendors
   USING (is_wedding_member(wedding_id))
   WITH CHECK (is_wedding_member(wedding_id));
 
--- expenses: members can read/write
 CREATE POLICY "expenses_all" ON expenses
   USING (is_wedding_member(wedding_id))
   WITH CHECK (is_wedding_member(wedding_id));
 
--- ang_baos: members can read/write
 CREATE POLICY "ang_baos_all" ON ang_baos
   USING (is_wedding_member(wedding_id))
   WITH CHECK (is_wedding_member(wedding_id));
 
 -- ============================================================
--- Triggers: auto-update updated_at
+-- Triggers (drop first so re-runs don't error)
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -189,6 +193,9 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS weddings_updated_at ON weddings;
+DROP TRIGGER IF EXISTS vendors_updated_at ON vendors;
 
 CREATE TRIGGER weddings_updated_at BEFORE UPDATE ON weddings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
