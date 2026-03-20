@@ -99,22 +99,23 @@ export default function OnboardingPage() {
 
     const budget = parseFloat(state.totalBudget)
 
-    // 1. Create wedding
-    const { data: wedding, error: wErr } = await supabase
-      .from('weddings')
-      .insert({
+    // 1. Create wedding via server-side API route (avoids RLS session race condition
+    //    that occurs when inserting directly from the browser after magic link auth)
+    const wRes = await fetch('/api/weddings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         name: state.weddingName || `${user.email?.split('@')[0]}'s Wedding`,
         date: state.weddingDate || null,
         total_budget: budget,
-        venue_tier: (state.venueTier || null) as VenueTier | null,
+        venue_tier: state.venueTier || null,
         guest_count: state.guestCount ? parseInt(state.guestCount) : null,
-        created_by: user.id,
-      })
-      .select()
-      .single()
-
-    if (wErr || !wedding) {
-      setError(wErr?.message || 'Failed to create wedding')
+      }),
+    })
+    const wJson = await wRes.json()
+    const wedding = wJson.data
+    if (!wRes.ok || !wedding) {
+      setError(wJson.error || 'Failed to create wedding')
       setSubmitting(false)
       return
     }
