@@ -19,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           { href: '/dashboard', label: 'Dashboard', icon: '◈' },
           { href: '/vendors', label: 'Vendors', icon: '🏪' },
           { href: '/cards', label: 'Cards', icon: '💳' },
+          { href: '/expenses', label: 'Expenses', icon: '🧾' },
           { href: '/settings', label: 'Settings', icon: '⚙' },
         ].map(({ href, label, icon }) => (
           <Link
